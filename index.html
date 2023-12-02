@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>等一下吃什麼 for 台大</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      text-align: center;
+      margin: 20px;
+      background-image: url('https://cdn.discordapp.com/attachments/1180573736085225554/1180575983422681148/4aaa312c-5234-4875-a439-4dc154b45eea.jfif?ex=657dec10&is=656b7710&hm=dc26060a2775c50842e235e812673ee57d7862075ebc37f7a9ebe58cb42ff198&#.jpg');
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-attachment: fixed; /* 使背景圖片固定，不隨滾動而移動 */
+      color: #000000; /* 調整文字顏色以使其在背景上清晰可見 */
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    #result {
+    margin-top: 20px;
+    background-color: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    max-width: 700px;
+    margin: 25px auto;
+    }
+
+  #selected-shop,
+  #shop-address {
+    font-size: 20px; /* 調整字體大小 */
+  }
+
+    #map {
+      max-width: 700px;
+      width: 100%;
+      height: 500px;
+      margin-top: 20px;
+      position: relative;
+      left: 50%;
+      transform: translateX(-50%);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    button {
+      display: block;
+      margin: 20px auto;
+      padding: 12px 24px;
+      font-size: 18px;
+      background-color: #007BFF;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    /* 美化下拉式選單 */
+    #district {
+      font-size: 16px;
+      padding: 10px;
+      border: 2px solid #007BFF;
+      border-radius: 8px;
+      background-color: #fff;
+      color: #333;
+      appearance: none; /* 隱藏原生下拉箭頭 */
+      cursor: pointer;
+    }
+
+    #district:hover {
+      background-color: #f2f2f2;
+    }
+
+    #district:focus {
+      outline: none;
+      box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <h1>等一下吃什麼 for 台大</h1>
+  
+  <label for="district">請選擇分區：</label>
+  <select id="district">
+    <option value="all">全部分區</option>
+    <option value="公館北">公館北</option>
+    <option value="公館南">公館南</option>
+    <option value="新生南">新生南</option>
+    <option value="118">118</option>
+  </select>
+
+  <button onclick="randomSelect()">隨機選擇店家</button>
+
+  <div id="result">
+    <p id="selected-shop"></p>
+    <p id="shop-address"></p>
+  </div>
+  <div id="map"></div>
+
+  <script>
+    async function randomSelect() {
+      try {
+        var district = document.getElementById("district").value;
+        var sheetData = await fetchSheetData();
+
+        if (sheetData.length === 0) {
+          alert("沒有店家資訊");
+          return;
+        }
+
+        var filteredShops = (district === "all") ? sheetData : sheetData.filter(shop => shop.district === district);
+
+        if (filteredShops.length === 0) {
+          alert("在此分區沒有店家資訊");
+          return;
+        }
+
+        var randomIndex = Math.floor(Math.random() * filteredShops.length);
+        var selectedShop = filteredShops[randomIndex];
+
+        var resultElement = document.getElementById("result");
+        var selectedShopElement = document.getElementById("selected-shop");
+        var shopAddressElement = document.getElementById("shop-address");
+
+        selectedShopElement.textContent = `選中的店家：${selectedShop.name}`;
+        shopAddressElement.textContent = `地址：${selectedShop.address}`;
+
+        resultElement.appendChild(selectedShopElement);
+        // resultElement.appendChild(document.createElement("br")); // 插入換行
+        resultElement.appendChild(shopAddressElement);
+
+        // 顯示 Google 地圖
+        showGoogleMap(selectedShop.address);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    }
+    
+    async function fetchSheetData() {
+      var apiKey = 'AIzaSyD9ZKUUbt1UQrCCiU2REGzn7pdYVMq99WY';
+      var sheetId = '1ZecMdl7_VZae3zbR07zvXf57n0H8rwhMMjXuUL4Pd8I';
+      var sheetName = '118'; // 修改為你的工作表名稱
+
+      var apiUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetName}?alt=json&key=${apiKey}`;
+      var response = await fetch(apiUrl);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch data. Status: ${response.status}`);
+      }
+
+      var data = await response.json();
+      var values = data.values || [];
+
+      // Remove header row if present
+      if (values.length > 0) {
+        var headerRow = values.shift();
+        var shops = values.map(row => {
+          return {
+            name: row[0],
+            address: row[1],
+            district: row[2]
+          };
+        });
+        return shops;
+      }
+
+      return [];
+    }
+
+
+
+
+    function showGoogleMap(address) {
+  var mapElement = document.getElementById("map");
+
+  // 使用 Google Maps JavaScript API 初始化地圖
+  var map = new google.maps.Map(mapElement, {
+    zoom: 15
+  });
+
+  // 使用 Google Geocoding API 獲取地址的經緯度
+  var geocoder = new google.maps.Geocoder();
+  geocoder.geocode({ address: address }, function (results, status) {
+    if (status === "OK") {
+      var location = results[0].geometry.location;
+
+      // 在地圖上標記店家位置
+      var marker = new google.maps.Marker({
+        position: location,
+        map: map,
+        title: address
+      });
+
+      // 設置地圖中心為店家位置
+      map.setCenter(location);
+
+      // 等待地圖完全加載後再執行調整中心位置的操作
+      google.maps.event.addListenerOnce(map, 'idle', function () {
+        // 調整地圖中心位置，使其在視窗中間
+        var center = new google.maps.LatLng(location.lat(), location.lng());
+        map.panTo(center);
+      });
+    } else {
+      console.error("Geocode was not successful for the following reason: " + status);
+    }
+  });
+}
+  </script>
+  <!-- 引入 Google Maps JavaScript API -->
+  <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyD9ZKUUbt1UQrCCiU2REGzn7pdYVMq99WY">
+  </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
